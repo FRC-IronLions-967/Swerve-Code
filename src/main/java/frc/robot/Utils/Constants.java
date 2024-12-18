@@ -23,7 +23,15 @@ public final class Constants {
     public static final double kSecondsPerMinute = 60.0;
 
     public static final double objectDetectionCameraYawOffset = 0.0;
-    public static final double kMaxNeoSpeed = 
+    public static final double kMaxNeoSpeed = 5676.0;
+
+    public static final double swerveTurningP = 1.5;
+    public static final double swerveTurningI = 0.0;
+    public static final double swerveTurningD = 0.5;
+    public static final double swerveDriveMotorP = 0.08;
+    public static final double swerveDriveMotorI = 0.0;
+    public static final double swerveDriveMotorD = 0.025;
+    public static final double swerveDriveMotorFF = 0.28;
   
     // private static final double kModuleMaxAngularVelocity = kMaxAngularSpeed;
     // private static final double kModuleMaxAngularAcceleration =
