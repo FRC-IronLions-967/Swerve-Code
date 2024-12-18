@@ -1,0 +1,217 @@
+{
+  "version": 1.0,
+  "startingPose": {
+    "position": {
+      "x": 0.8488191383965702,
+      "y": 4.522894353845579
+    },
+    "rotation": 123.41
+  },
+  "command": {
+    "type": "sequential",
+    "data": {
+      "commands": [
+        {
+          "type": "named",
+          "data": {
+            "name": "MoveToSpeakerPositionCommand"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "RunScorerCommand"
+          }
+        },
+        {
+          "type": "parallel",
+          "data": {
+            "commands": [
+              {
+                "type": "path",
+                "data": {
+                  "pathName": "Start to 3"
+                }
+              },
+              {
+                "type": "named",
+                "data": {
+                  "name": "RunAndExtendIntakeCommand"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "SpinUpScorer"
+          }
+        },
+        {
+          "type": "parallel",
+          "data": {
+            "commands": [
+              {
+                "type": "named",
+                "data": {
+                  "name": "RetractIntakeCommand"
+                }
+              },
+              {
+                "type": "named",
+                "data": {
+                  "name": "MoveToTransferPositionCommand"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "TransferNoteCommand"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "MiddleNoteShot"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "AutoFireCommand"
+          }
+        },
+        {
+          "type": "parallel",
+          "data": {
+            "commands": [
+              {
+                "type": "path",
+                "data": {
+                  "pathName": "3 to 2"
+                }
+              },
+              {
+                "type": "named",
+                "data": {
+                  "name": "RunAndExtendIntakeCommand"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "SpinUpScorer"
+          }
+        },
+        {
+          "type": "parallel",
+          "data": {
+            "commands": [
+              {
+                "type": "named",
+                "data": {
+                  "name": "MoveToTransferPositionCommand"
+                }
+              },
+              {
+                "type": "named",
+                "data": {
+                  "name": "RetractIntakeCommand"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "TransferNoteCommand"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "MiddleNoteShot"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "AutoFireCommand"
+          }
+        },
+        {
+          "type": "parallel",
+          "data": {
+            "commands": [
+              {
+                "type": "path",
+                "data": {
+                  "pathName": "2 to 1"
+                }
+              },
+              {
+                "type": "named",
+                "data": {
+                  "name": "RunAndExtendIntakeCommand"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "SpinUpScorer"
+          }
+        },
+        {
+          "type": "parallel",
+          "data": {
+            "commands": [
+              {
+                "type": "named",
+                "data": {
+                  "name": "MoveToTransferPositionCommand"
+                }
+              },
+              {
+                "type": "named",
+                "data": {
+                  "name": "RetractIntakeCommand"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "TransferNoteCommand"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "MiddleNoteShot"
+          }
+        },
+        {
+          "type": "named",
+          "data": {
+            "name": "AutoFireCommand"
+          }
+        }
+      ]
+    }
+  },
+  "folder": null,
+  "choreoAuto": false
+}
