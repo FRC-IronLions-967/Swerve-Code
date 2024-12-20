@@ -5,14 +5,12 @@
 package frc.robot.lib;
 
 import com.revrobotics.spark.SparkMax;
+import com.revrobotics.spark.SparkBase.ControlType;
 import com.revrobotics.spark.SparkFlex;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
+import com.revrobotics.spark.config.SparkMaxConfig;
 import com.revrobotics.spark.SparkClosedLoopController;
-import com.revrobotics.CANSparkBase.ControlType;
-import com.revrobotics.CANSparkBase.IdleMode;
-import com.revrobotics.CANSparkLowLevel.MotorType;
-import com.revrobotics.CANSparkLowLevel.PeriodicFrame;
-import com.revrobotics.SparkAbsoluteEncoder.Type;
+import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Rotation2d;
@@ -23,17 +21,11 @@ import frc.robot.Utils.Values;
 
 public class SdsSwerveModule {
 
-  private double swerveTurningP;
-  private double swerveTurningI;
-  private double swerveTurningD;
-  private double swerveDriveMotorP;
-  private double swerveDriveMotorI;
-  private double swerveDriveMotorD;
-  private double swerveDriveMotorFF;
-
   private SparkMax driveMotor;
   private SparkClosedLoopController driveMotorController;
+  private SparkMaxConfig driveConfig;
   private SparkMax turningMotor;
+  private SparkMaxConfig turningConfig;
   private SparkClosedLoopController turningPIDController;
 
   private int driveID;
@@ -60,25 +52,22 @@ public class SdsSwerveModule {
 
     driveMotor = new SparkMax(driveMotorCANId, MotorType.kBrushless);
     turningMotor = new SparkMax(turningMotorCANId, MotorType.kBrushless);
-    turningMotor.setSmartCurrentLimit(40);
-    turningMotor.setIdleMode(IdleMode.kBrake);
-    driveMotor.setSecondaryCurrentLimit(80);
-    driveMotor.setIdleMode(IdleMode.kCoast);
+    driveConfig = new SparkMaxConfig();
+    turningConfig = new SparkMaxConfig();
+    driveConfig.idleMode(IdleMode.kCoast);
+    turningConfig.idleMode(IdleMode.kBrake);
+    driveConfig.smartCurrentLimit(40);
+    driveConfig.secondaryCurrentLimit(80);
+
     driveID = driveMotorCANId;
     turnID = turningMotorCANId;
 
+    driveConfig.closedLoop.pidf(Constants.swerveDriveMotorP, Constants.swerveDriveMotorI, Constants.swerveDriveMotorD, Constants.swerveDriveMotorFF);
+    turningConfig.closedLoop.pid(Constants.swerveTurningP, Constants.swerveTurningI, Constants.swerveTurningD);
+
     turningPIDController = turningMotor.getClosedLoopController();
     turningPIDController.setFeedbackDevice(turningMotor.getAbsoluteEncoder(Type.kDutyCycle));
-
-    swerveTurningP = Values.getInstance().getDoubleValue("swerveTurningP");
-    swerveTurningI = Values.getInstance().getDoubleValue("swerveTurningI");
-    swerveTurningD = Values.getInstance().getDoubleValue("swerveTurningD");
-    swerveDriveMotorP = Values.getInstance().getDoubleValue("swerveDriveMotorP");
-    swerveDriveMotorI = Values.getInstance().getDoubleValue("swerveDriveMotorI");
-    swerveDriveMotorD = Values.getInstance().getDoubleValue("swerveDriveMotorD");
-    swerveDriveMotorFF = Values.getInstance().getDoubleValue("swerveDriveMotorFF");
     
-
     //REVPhysicsSim.getInstance().addSparkMax(driveMotor, DCMotor.getNEO(1));
     //REVPhysicsSim.getInstance().addSparkMax(turningMotor, DCMotor.getVex775Pro(1));
 
@@ -90,25 +79,15 @@ public class SdsSwerveModule {
     //driveMotor.getEncoder().setVelocityConversionFactor(Constants.kMaxSpeed/5700);
     driveMotor.getEncoder().setPositionConversionFactor((2.0 * Math.PI * Constants.kWheelRadius) / Constants.kGearRatio);
     driveMotorController = driveMotor.getClosedLoopController();
-    driveMotorController.setP(swerveDriveMotorP);
-    driveMotorController.setI(swerveDriveMotorI);
-    driveMotorController.setD(swerveDriveMotorD);
-    driveMotorController.setFF(swerveDriveMotorFF);
+    
 
     turningPIDController.setPositionPIDWrappingEnabled(true);
     turningMotor.getAbsoluteEncoder(Type.kDutyCycle).setPositionConversionFactor(2*Math.PI);
     turningMotor.getAbsoluteEncoder(Type.kDutyCycle).setInverted(true);
     turningMotor.setPeriodicFramePeriod(PeriodicFrame.kStatus5, 20);
     turningMotor.setPeriodicFramePeriod(PeriodicFrame.kStatus6, 20);
-    turningPIDController.setP(swerveTurningP);
-    turningPIDController.setI(swerveTurningI);
-    turningPIDController.setD(swerveTurningD);
 
-    if (turnID == 4) {
-      driveMotor.setInverted(true);
-    } else {
-      driveMotor.setInverted(false);
-    }
+    driveConfig.inverted(true);
   }
 
 
@@ -133,11 +112,11 @@ public class SdsSwerveModule {
   }
 
   public void changeDriveToBrake() {
-    driveMotor.setIdleMode(IdleMode.kBrake);
+    driveConfig.idleMode(IdleMode.kBrake);
   }
 
   public void changeDriveToCoast() {
-    driveMotor.setIdleMode(IdleMode.kCoast);
+    driveConfig.idleMode(IdleMode.kCoast);
   }
 
   /**
@@ -165,8 +144,8 @@ public class SdsSwerveModule {
     // SmartDashboard.putNumber("Module Angle" + driveID,turningEncoder.getAbsolutePosition());
     // SmartDashboard.putNumber("Commanded Angle" + driveID, state.angle.getRadians());
 
-    driveMotorController.setReference(state.speedMetersPerSecond, ControlType.kVelocity);
     turningPIDController.setReference(convertedPosition, ControlType.kPosition);
+    driveMotorController.setReference(state.speedMetersPerSecond, ControlType.kVelocity);
     //if (turnOutput > 0.5 ) {
     //  turningMotor.setVoltage(turnOutput);
     //} else {
@@ -175,7 +154,7 @@ public class SdsSwerveModule {
   }
 
   private double ConvertedTurningPosition() {
-    return turningMotor.getAbsoluteEncoder(Type.kDutyCycle).getPosition() - Math.PI;
+    return turningMotor.getAbsoluteEncoder(ControlType.kDutyCycle).getPosition() - Math.PI;
   }
 
 }
