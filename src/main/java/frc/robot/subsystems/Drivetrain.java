@@ -4,7 +4,7 @@
 
 package frc.robot.subsystems;
 
-import com.kauailabs.navx.frc.AHRS;
+import com.studica.frc.AHRS;
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.config.PIDConstants;
 import com.pathplanner.lib.util.HolonomicPathFollowerConfig;
@@ -48,7 +48,7 @@ public class Drivetrain extends SubsystemBase {
   private final SdsSwerveModule m_backRight = new SdsSwerveModule(1, 2);
   private XBoxController driveController;
 //first two colums above are done
-  private final AHRS m_gyro = new AHRS(SerialPort.Port.kMXP);
+  private final AHRS m_gyro = new AHRS(AHRS.NavXComType.kMXP_SPI, AHRS.NavXUpdateRate.k50Hz);
 
 
   private final SwerveDriveOdometry m_odometry =

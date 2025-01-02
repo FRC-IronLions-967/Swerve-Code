@@ -10,6 +10,7 @@ import com.revrobotics.spark.SparkFlex;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
 import com.revrobotics.spark.config.SparkMaxConfig;
 import com.revrobotics.spark.config.ClosedLoopConfig.FeedbackSensor;
+import com.revrobotics.spark.SparkBase;
 import com.revrobotics.spark.SparkClosedLoopController;
 import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
 
@@ -25,6 +26,7 @@ public class SdsSwerveModule {
   private SparkMax driveMotor;
   private SparkClosedLoopController driveMotorController;
   private SparkMaxConfig driveConfig;
+
   private SparkMax turningMotor;
   private SparkMaxConfig turningConfig;
   private SparkClosedLoopController turningPIDController;
@@ -54,42 +56,38 @@ public class SdsSwerveModule {
     driveMotor = new SparkMax(driveMotorCANId, MotorType.kBrushless);
     turningMotor = new SparkMax(turningMotorCANId, MotorType.kBrushless);
     driveConfig = new SparkMaxConfig();
+    driveConfig
+      .smartCurrentLimit(80)
+      .idleMode(IdleMode.kCoast)
+      .inverted(true);
+    driveConfig.closedLoop
+      .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
+      .pidf(Constants.swerveDriveMotorP, Constants.swerveDriveMotorI, Constants.swerveDriveMotorD, Constants.swerveDriveMotorFF);
+    driveConfig.encoder
+      .velocityConversionFactor((2.0 * Math.PI * Constants.kWheelRadius) / (Constants.kSecondsPerMinute * Constants.kGearRatio))
+      .positionConversionFactor((2.0 * Math.PI * Constants.kWheelRadius) / Constants.kGearRatio);
+    driveMotor.configure(driveConfig, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
+
     turningConfig = new SparkMaxConfig();
-    driveConfig.idleMode(IdleMode.kCoast);
-    turningConfig.idleMode(IdleMode.kBrake);
-    driveConfig.smartCurrentLimit(40);
-    driveConfig.secondaryCurrentLimit(80);
+    turningConfig
+      .idleMode(IdleMode.kBrake)
+      .smartCurrentLimit(40);
+    turningConfig.closedLoop
+      .pid(Constants.swerveTurningP, Constants.swerveTurningI, Constants.swerveTurningD)
+      .positionWrappingEnabled(true)
+      .feedbackSensor(FeedbackSensor.kAbsoluteEncoder);
+    turningConfig.encoder
+      .inverted(true)
+      .positionConversionFactor(2*Math.PI);
+    turningMotor.configure(turningConfig, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
+    
+    driveMotorController = driveMotor.getClosedLoopController();
+    turningPIDController = turningMotor.getClosedLoopController();
 
     driveID = driveMotorCANId;
     turnID = turningMotorCANId;
 
-    driveConfig.closedLoop.pidf(Constants.swerveDriveMotorP, Constants.swerveDriveMotorI, Constants.swerveDriveMotorD, Constants.swerveDriveMotorFF);
-    turningConfig.closedLoop.pid(Constants.swerveTurningP, Constants.swerveTurningI, Constants.swerveTurningD);
-
-    turningPIDController = turningMotor.getClosedLoopController();
-    turningPIDController.setFeedbackDevice(turningMotor.getAbsoluteEncoder(Type.kDutyCycle));
-
-    
-    //REVPhysicsSim.getInstance().addSparkMax(driveMotor, DCMotor.getNEO(1));
-    //REVPhysicsSim.getInstance().addSparkMax(turningMotor, DCMotor.getVex775Pro(1));
-
-    /*
-     * native units of rpm to m/s
-     */
-    driveConfig.encoder.velocityConversionFactor((2.0 * Math.PI * Constants.kWheelRadius) / (Constants.kSecondsPerMinute * Constants.kGearRatio));
-    // native units of revolutions to meters
-    //driveMotor.getEncoder().setVelocityConversionFactor(Constants.kMaxSpeed/5700);
-    driveConfig.encoder.positionConversionFactor((2.0 * Math.PI * Constants.kWheelRadius) / Constants.kGearRatio);
-    driveMotorController = driveMotor.getClosedLoopController();
-    
-
-    turningPIDController.setPositionPIDWrappingEnabled(true);
-    turningMotor.getAbsoluteEncoder(Type.kDutyCycle).setPositionConversionFactor(2*Math.PI);
-    turningMotor.getAbsoluteEncoder(Type.kDutyCycle).setInverted(true);
-    turningMotor.setPeriodicFramePeriod(PeriodicFrame.kStatus5, 20);
-    turningMotor.setPeriodicFramePeriod(PeriodicFrame.kStatus6, 20);
-
-    driveConfig.inverted(true);
+    // TODO - Simulation support;
   }
 
 
@@ -115,10 +113,12 @@ public class SdsSwerveModule {
 
   public void changeDriveToBrake() {
     driveConfig.idleMode(IdleMode.kBrake);
+    driveMotor.configure(driveConfig, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
   }
 
   public void changeDriveToCoast() {
     driveConfig.idleMode(IdleMode.kCoast);
+    driveMotor.configure(driveConfig, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
   }
 
   /**
@@ -156,7 +156,7 @@ public class SdsSwerveModule {
   }
 
   private double ConvertedTurningPosition() {
-    return turningMotor.getAbsoluteEncoder(ControlType.kDutyCycle).getPosition() - Math.PI;
+    return turningMotor.getAbsoluteEncoder().getPosition() - Math.PI;
   }
 
 }
