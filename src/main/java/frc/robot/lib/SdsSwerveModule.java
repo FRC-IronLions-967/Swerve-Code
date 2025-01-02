@@ -9,6 +9,7 @@ import com.revrobotics.spark.SparkBase.ControlType;
 import com.revrobotics.spark.SparkFlex;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
 import com.revrobotics.spark.config.SparkMaxConfig;
+import com.revrobotics.spark.config.ClosedLoopConfig.FeedbackSensor;
 import com.revrobotics.spark.SparkClosedLoopController;
 import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
 
@@ -67,6 +68,7 @@ public class SdsSwerveModule {
 
     turningPIDController = turningMotor.getClosedLoopController();
     turningPIDController.setFeedbackDevice(turningMotor.getAbsoluteEncoder(Type.kDutyCycle));
+
     
     //REVPhysicsSim.getInstance().addSparkMax(driveMotor, DCMotor.getNEO(1));
     //REVPhysicsSim.getInstance().addSparkMax(turningMotor, DCMotor.getVex775Pro(1));
@@ -74,10 +76,10 @@ public class SdsSwerveModule {
     /*
      * native units of rpm to m/s
      */
-    driveMotor.getEncoder().setVelocityConversionFactor((2.0 * Math.PI * Constants.kWheelRadius) / (Constants.kSecondsPerMinute * Constants.kGearRatio));
+    driveConfig.encoder.velocityConversionFactor((2.0 * Math.PI * Constants.kWheelRadius) / (Constants.kSecondsPerMinute * Constants.kGearRatio));
     // native units of revolutions to meters
     //driveMotor.getEncoder().setVelocityConversionFactor(Constants.kMaxSpeed/5700);
-    driveMotor.getEncoder().setPositionConversionFactor((2.0 * Math.PI * Constants.kWheelRadius) / Constants.kGearRatio);
+    driveConfig.encoder.positionConversionFactor((2.0 * Math.PI * Constants.kWheelRadius) / Constants.kGearRatio);
     driveMotorController = driveMotor.getClosedLoopController();
     
 
