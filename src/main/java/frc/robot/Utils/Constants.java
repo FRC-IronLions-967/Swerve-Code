@@ -3,11 +3,17 @@ package frc.robot.Utils;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.pathplanner.lib.config.ModuleConfig;
+import com.pathplanner.lib.config.RobotConfig;
+
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
+import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.commands.DoNothingCommand;
+
+import static edu.wpi.first.units.Units.*;
 
 public final class Constants {
 
@@ -18,6 +24,7 @@ public final class Constants {
     public static final double kMaxAngularAcceleration = kMaxAcceleration / kDriveRadius; // Maximum angular acceleration
     public static final double kWheelRadius = 0.0489;
     //the number above is acurate
+    public static final double kCoefficientFriction = 1.542;
     public static final double kGearRatio = 6.75;
     //needs tunings
     public static final double kSecondsPerMinute = 60.0;
@@ -47,6 +54,12 @@ public final class Constants {
     public static final TrapezoidProfile.Constraints kThetaControllerConstraints =
     new TrapezoidProfile.Constraints(
         kMaxAngularSpeed, kMaxAngularAcceleration);
+
+    public static final RobotConfig autoConfig = new RobotConfig(
+          Kilograms.of(45.0), 
+          KilogramSquareMeters.of(1.45), 
+          new ModuleConfig(kWheelRadius, kMaxSpeed, kCoefficientFriction, DCMotor.getNEO(1), 80.0, 4),
+          m_frontLeftLocation, m_frontRightLocation, m_backLeftLocation, m_backRightLocation);
 
     public static final Map<String, Command> autoEventMap = new HashMap<>();
     static {

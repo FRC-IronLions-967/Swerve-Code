@@ -7,8 +7,8 @@ package frc.robot.subsystems;
 import com.studica.frc.AHRS;
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.config.PIDConstants;
-import com.pathplanner.lib.util.HolonomicPathFollowerConfig;
-import com.pathplanner.lib.util.ReplanningConfig;
+import com.pathplanner.lib.config.RobotConfig;
+import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.filter.SlewRateLimiter;
@@ -20,7 +20,6 @@ import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.SerialPort;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.IO;
@@ -68,25 +67,51 @@ public class Drivetrain extends SubsystemBase {
     driveController = IO.getInstance().getDriverController();
   }
 
+
+  /**
+   * Set up path planner after subsystem is initialized in order to avoid singleton recursion.
+   */
   public void setupPathPlanner(){
+    // Load the RobotConfig from the GUI settings. You should probably
+    // store this in your Constants file
+    RobotConfig config;
+    try{
+      config = RobotConfig.fromGUISettings();
+    } catch (Exception e) {
+      // Handle exception as needed
+      e.printStackTrace();
+      config = Constants.autoConfig;
+    }
     //m_gyro.reset();
       // Configure the AutoBuilder last
     AutoBuilder.configure(
       this::getPose, // Robot pose supplier
       this::resetOdometry, // Method to reset odometry (will be called if your auto has a starting pose)
       this::getChassisSpeeds, // ChassisSpeeds supplier. MUST BE ROBOT RELATIVE
-      this::driveRobotRelative, // Method that will drive the robot given ROBOT RELATIVE ChassisSpeeds
-      new HolonomicPathFollowerConfig( // HolonomicPathFollowerConfig, this should likely live in your Constants class
+      (speeds, feedforwards) -> driveRobotRelative(speeds), // Method that will drive the robot given ROBOT RELATIVE ChassisSpeeds. Also optionally outputs individual module feedforwards
+      new PPHolonomicDriveController( // PPHolonomicController is the built in path following controller for holonomic drive trains
           new PIDConstants(5.0, 0.0, 0.0), // Translation PID constants
-          new PIDConstants(4.0, 0.0, 0.0), // Rotation PID constants
-          4.0, // Max module speed, in m/s
-          Constants.kDriveRadius, // Drive base radius in meters. Distance from robot center to furthest module.
-          new ReplanningConfig() // Default path replanning config. See the API for the options here
+          new PIDConstants(4.0, 0.0, 0.0) // Rotation PID constants
+          // 4.0, // Max module speed, in m/s
+          // Constants.kDriveRadius, // Drive base radius in meters. Distance from robot center to furthest module.
+          // new ReplanningConfig() // Default path replanning config. See the API for the options here
       ),
-      this::shouldFlipPath,
+      config,
+      () -> {
+        // Boolean supplier that controls when the path will be mirrored for the red alliance
+        // This will flip the path being followed to the red side of the field.
+        // THE ORIGIN WILL REMAIN ON THE BLUE SIDE
+
+        var alliance = DriverStation.getAlliance();
+        if (alliance.isPresent()) {
+          return alliance.get() == DriverStation.Alliance.Red;
+        }
+        return false;
+      },
       this // Reference to this subsystem to set requirements
     );
   }
+
 
   /**
    * Generic method to drive the robot using speed inputs
@@ -112,7 +137,12 @@ public class Drivetrain extends SubsystemBase {
     m_backRight.setDesiredState(swerveModuleStates[3]);
   }
 
-  public void driveRobotRelative(ChassisSpeeds chassisSpeeds, ) {
+
+  /**
+   * Used by pathplanner to drive using robot relative inputs.
+   * @param chassisSpeeds the commanded chassisSpeeds to drive at
+   */
+  public void driveRobotRelative(ChassisSpeeds chassisSpeeds) {
     chassisSpeeds.omegaRadiansPerSecond = -chassisSpeeds.omegaRadiansPerSecond;
 
     //Time slice discretization code taken from 254/YAGSL
@@ -127,6 +157,11 @@ public class Drivetrain extends SubsystemBase {
     m_backRight.setDesiredState(swerveModuleStates[3]);
   }
 
+
+  /**
+   * set desired state of each module, not currently used
+   * @param swerveModuleStates
+   */
   public void setModuleStates(SwerveModuleState[] swerveModuleStates) {
     SwerveDriveKinematics.desaturateWheelSpeeds(swerveModuleStates, Constants.kMaxSpeed);
     m_frontLeft.setDesiredState(swerveModuleStates[0]);
@@ -135,7 +170,10 @@ public class Drivetrain extends SubsystemBase {
     m_backRight.setDesiredState(swerveModuleStates[3]);
   }
 
-  /** Updates the field relative position of the robot. */
+
+  /**
+   * Updates the field relative position of the robot.
+   */
   public void updateOdometry() {
     m_odometry.update(
         m_gyro.getRotation2d(),
@@ -147,14 +185,29 @@ public class Drivetrain extends SubsystemBase {
         });
   }
 
+
+  /**
+   * Get the pose of the robot
+   * @return current odometry pose
+   */
   public Pose2d getPose() {
     return m_odometry.getPoseMeters();
   }
 
+
+  /**
+   * get the current speeds of all modules
+   * @return current ChassisSpeeds
+   */
   private ChassisSpeeds getChassisSpeeds() {
     return Constants.m_kinematics.toChassisSpeeds(getStates());
   }
 
+
+  /**
+   * get the state of each module
+   * @return array of module states
+   */
   private SwerveModuleState[] getStates() {
     return new SwerveModuleState[] {
       m_frontLeft.getState(),
@@ -164,6 +217,11 @@ public class Drivetrain extends SubsystemBase {
     };
   }
 
+
+  /**
+   * get the position of all modules
+   * @return position of all modules
+   */
   private SwerveModulePosition[] getPosition() {
     return new SwerveModulePosition[] {
       m_frontLeft.getPosition(),
@@ -173,22 +231,27 @@ public class Drivetrain extends SubsystemBase {
     };
   }
 
+
+  /**
+   * reset the odometry object
+   * @param pose new pose to set odometry to.
+   */
   public void resetOdometry(Pose2d pose) {
     m_odometry.resetPosition(m_gyro.getRotation2d(), getPosition(), pose);
   }
 
-  private boolean shouldFlipPath() {
-    var alliance = DriverStation.getAlliance();
-    if (alliance.isPresent()) {
-        return alliance.get() == DriverStation.Alliance.Red;
-    }
-    return false;
-  }
 
+  /**
+   * Reset the gyro heading
+   */
   public void resetGyro() {
     m_gyro.zeroYaw();
   }
 
+
+  /**
+   * change all drive motors to brake mode
+   */
   public void setDriveToBrake() {
     m_backLeft.changeDriveToBrake();
     m_backRight.changeDriveToBrake();
@@ -196,12 +259,17 @@ public class Drivetrain extends SubsystemBase {
     m_frontRight.changeDriveToBrake();
   }
 
+
+  /**
+   * change all drive motors to coast mode
+   */
   public void setDriveToCoast() {
     m_backLeft.changeDriveToCoast();
     m_backRight.changeDriveToCoast();
     m_frontLeft.changeDriveToCoast();
     m_frontRight.changeDriveToCoast();
   }
+
 
   /**
    * Standard Teleop driving
@@ -237,6 +305,7 @@ public class Drivetrain extends SubsystemBase {
         drive(xSpeed, ySpeed, rot, fieldRelative);
       }
   }
+
 
   /**
    * Drive the robot using sensor inputs for the rotation and driver input translation.
@@ -277,7 +346,6 @@ public class Drivetrain extends SubsystemBase {
   }  
 
   
-
   /**
    * Get joystick values 
    * Set motor inputs

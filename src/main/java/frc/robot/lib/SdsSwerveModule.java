@@ -6,7 +6,6 @@ package frc.robot.lib;
 
 import com.revrobotics.spark.SparkMax;
 import com.revrobotics.spark.SparkBase.ControlType;
-import com.revrobotics.spark.SparkFlex;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
 import com.revrobotics.spark.config.SparkMaxConfig;
 import com.revrobotics.spark.config.ClosedLoopConfig.FeedbackSensor;
@@ -19,7 +18,6 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import frc.robot.Utils.Constants;
-import frc.robot.Utils.Values;
 
 public class SdsSwerveModule {
 
@@ -128,10 +126,9 @@ public class SdsSwerveModule {
    */
   public void setDesiredState(SwerveModuleState desiredState) {
     // Optimize the reference state to avoid spinning further than 90 degrees
-    SwerveModuleState state =
-        SwerveModuleState.optimize(desiredState, new Rotation2d(ConvertedTurningPosition()));
+    desiredState.optimize(new Rotation2d(ConvertedTurningPosition()));
 
-    double convertedPosition = MathUtil.angleModulus(state.angle.getRadians()) + Math.PI;
+    double convertedPosition = MathUtil.angleModulus(desiredState.angle.getRadians()) + Math.PI;
       
     // if (i == 0) {
     //   System.out.println("Measured Angle   " + driveID + ":   " + ConvertedTurningPosition());
@@ -147,7 +144,7 @@ public class SdsSwerveModule {
     // SmartDashboard.putNumber("Commanded Angle" + driveID, state.angle.getRadians());
 
     turningPIDController.setReference(convertedPosition, ControlType.kPosition);
-    driveMotorController.setReference(state.speedMetersPerSecond, ControlType.kVelocity);
+    driveMotorController.setReference(desiredState.speedMetersPerSecond, ControlType.kVelocity);
     //if (turnOutput > 0.5 ) {
     //  turningMotor.setVoltage(turnOutput);
     //} else {
