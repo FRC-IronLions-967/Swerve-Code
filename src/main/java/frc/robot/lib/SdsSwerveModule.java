@@ -9,14 +9,20 @@ import com.revrobotics.spark.SparkBase.ControlType;
 import com.revrobotics.spark.SparkLowLevel.MotorType;
 import com.revrobotics.spark.config.SparkMaxConfig;
 import com.revrobotics.spark.config.ClosedLoopConfig.FeedbackSensor;
+import com.revrobotics.sim.SparkMaxSim;
 import com.revrobotics.spark.SparkBase;
 import com.revrobotics.spark.SparkClosedLoopController;
 import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
 
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Transform2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.system.plant.DCMotor;
+import frc.robot.Robot;
 import frc.robot.Utils.Constants;
 
 public class SdsSwerveModule {
@@ -29,8 +35,18 @@ public class SdsSwerveModule {
   private SparkMaxConfig turningConfig;
   private SparkClosedLoopController turningPIDController;
 
+  private SparkMaxSim driveMotorSim;
+  private SparkMaxSim turningMotorSim;
+  // Simple PID feedback controllers run on the roborio
+  private PIDController drivePidController = new PIDController(Constants.swerveDriveMotorP, Constants.swerveDriveMotorI, Constants.swerveDriveMotorD);
+  private double driveVoltage = 0.0;
+  // (A profiled steering PID controller may give better results by utilizing feedforward.)
+  private PIDController turnPidController = new PIDController(Constants.swerveTurningP, Constants.swerveTurningI, Constants.swerveTurningD);
+  private double turnVoltage = 0.0;
+
   private int driveID;
   private int turnID;
+  private Translation2d position;
 
   private int i;
   // Gains are for example purposes only - must be determined for your own robot!
@@ -49,7 +65,8 @@ public class SdsSwerveModule {
    */
   public SdsSwerveModule(
       int driveMotorCANId,
-      int turningMotorCANId) {
+      int turningMotorCANId,
+      Translation2d modulePosition) {
 
     driveMotor = new SparkMax(driveMotorCANId, MotorType.kBrushless);
     turningMotor = new SparkMax(turningMotorCANId, MotorType.kBrushless);
@@ -62,8 +79,8 @@ public class SdsSwerveModule {
       .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
       .pidf(Constants.swerveDriveMotorP, Constants.swerveDriveMotorI, Constants.swerveDriveMotorD, Constants.swerveDriveMotorFF);
     driveConfig.encoder
-      .velocityConversionFactor((2.0 * Math.PI * Constants.kWheelRadius) / (Constants.kSecondsPerMinute * Constants.kGearRatio))
-      .positionConversionFactor((2.0 * Math.PI * Constants.kWheelRadius) / Constants.kGearRatio);
+      .velocityConversionFactor((2.0 * Math.PI * Constants.kWheelRadius) / (Constants.kSecondsPerMinute * Constants.kDriveGearRatio))
+      .positionConversionFactor((2.0 * Math.PI * Constants.kWheelRadius) / Constants.kDriveGearRatio);
     driveMotor.configure(driveConfig, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
 
     turningConfig = new SparkMaxConfig();
@@ -74,7 +91,7 @@ public class SdsSwerveModule {
       .pid(Constants.swerveTurningP, Constants.swerveTurningI, Constants.swerveTurningD)
       .positionWrappingEnabled(true)
       .feedbackSensor(FeedbackSensor.kAbsoluteEncoder);
-    turningConfig.encoder
+    turningConfig.absoluteEncoder
       .inverted(true)
       .positionConversionFactor(2*Math.PI);
     turningMotor.configure(turningConfig, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
@@ -84,8 +101,11 @@ public class SdsSwerveModule {
 
     driveID = driveMotorCANId;
     turnID = turningMotorCANId;
+    position = modulePosition;
 
-    // TODO - Simulation support;
+    // ----- Simulation support;
+    driveMotorSim = new SparkMaxSim(driveMotor, DCMotor.getNEO(1));
+    turningMotorSim = new SparkMaxSim(turningMotor, DCMotor.getNEO(1));
   }
 
 
@@ -119,6 +139,15 @@ public class SdsSwerveModule {
     driveMotor.configure(driveConfig, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
   }
 
+
+  /**
+   * Used to convert encoder positions from (0, 2 PI) to (-PI, PI)
+   * @return converted angle
+   */
+  private double ConvertedTurningPosition() {
+    return turningMotor.getAbsoluteEncoder().getPosition() - Math.PI;
+  }
+
   /**
    * Sets the desired state for the module.
    *
@@ -145,15 +174,52 @@ public class SdsSwerveModule {
 
     turningPIDController.setReference(convertedPosition, ControlType.kPosition);
     driveMotorController.setReference(desiredState.speedMetersPerSecond, ControlType.kVelocity);
+
+    if(Robot.isSimulation()) {
+      turnVoltage = turnPidController.calculate(
+          getAbsoluteHeading().getRadians(), convertedPosition);
+      driveVoltage = Constants.swerveDriveMotorFF * desiredState.speedMetersPerSecond + 
+          drivePidController.calculate(driveMotor.getEncoder().getVelocity(), desiredState.speedMetersPerSecond);
+      
+    }
     //if (turnOutput > 0.5 ) {
     //  turningMotor.setVoltage(turnOutput);
     //} else {
     //  turningMotor.setVoltage(0);
     //}
   }
-
-  private double ConvertedTurningPosition() {
-    return turningMotor.getAbsoluteEncoder().getPosition() - Math.PI;
+  
+  /** Module heading reported by steering encoder. */
+  public Rotation2d getAbsoluteHeading() {
+    return Rotation2d.fromRotations(turningMotor.getAbsoluteEncoder().getPosition());
   }
 
+
+  public Translation2d getModuleLocation() {
+    return position;
+  }
+
+  public double getDriveVoltage(){
+    return driveVoltage;
+  }
+
+  
+  public double getSteerVoltage(){
+    return turnVoltage;
+  }
+
+  public void simulationUpdate(
+            double driveEncoderRate,
+            double driveCurrent,
+            double steerEncoderRate,
+            double steerCurrent) {
+        // driveMotorSim.setPosition(driveEncoderDist);
+        // driveMotorSim.setVelocity(driveEncoderRate);
+        // //this.driveCurrentSim = driveCurrent;
+        // turningMotorSim.setPosition(steerEncoderDist);
+        // turningMotorSim.setVelocity(steerEncoderRate);
+        // //this.steerCurrentSim = steerCurrent;
+        driveMotorSim.iterate(driveEncoderRate, 12.0, Robot.kDefaultPeriod);
+        turningMotorSim.iterate(steerEncoderRate, 12.0, Robot.kDefaultPeriod);
+    }
 }

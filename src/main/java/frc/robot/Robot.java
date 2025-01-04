@@ -6,17 +6,21 @@ package frc.robot;
 
 import com.pathplanner.lib.auto.AutoBuilder;
 
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.simulation.BatterySim;
+import edu.wpi.first.wpilibj.simulation.RoboRioSim;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
-import frc.robot.subsystems.SubsystemsInstance;
+import frc.robot.subsystems.SubsystemsInst;
 import frc.robot.commands.*;
 import frc.robot.lib.LEDController;
 
 public class Robot extends TimedRobot {
-  private SubsystemsInstance subsystemsInst;
+  private SubsystemsInst subsystemsInst;
   private Command m_autonomousCommand;
   private SendableChooser<Command> autoChooser;
   private LEDController ledController;
@@ -28,13 +32,13 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void robotInit() {
-    subsystemsInst = SubsystemsInstance.getInstance();
+    subsystemsInst = SubsystemsInst.getInst();
     subsystemsInst.drivetrain.setupPathPlanner();
     CommandScheduler.getInstance().setDefaultCommand(subsystemsInst.drivetrain, new DefaultMoveCommand());
 
 
-    autoChooser = AutoBuilder.buildAutoChooser("Center Simple_Auto");
-    SmartDashboard.putData("Auto Chooser", autoChooser);
+    // autoChooser = AutoBuilder.buildAutoChooser("Center Simple_Auto");
+    // SmartDashboard.putData("Auto Chooser", autoChooser);
 
     ledController = new LEDController(0, 36);
   }
@@ -70,26 +74,26 @@ public class Robot extends TimedRobot {
     if (m_autonomousCommand != null) {
      m_autonomousCommand.schedule();
     }
-    SubsystemsInstance.getInstance().drivetrain.setDriveToBrake();
+    SubsystemsInst.getInst().drivetrain.setDriveToBrake();
   }
 
   /** This function is called periodically during autonomous. */
   @Override
   public void autonomousPeriodic() {
-    ledController.enabledPeriodic();
+    //ledController.enabledPeriodic();
   }
 
   /** This function is called once when teleop is enabled. */
   @Override
   public void teleopInit() {
     IO.getInstance().teleopInit();
-    SubsystemsInstance.getInstance().drivetrain.setDriveToCoast();
+    SubsystemsInst.getInst().drivetrain.setDriveToCoast();
   }
 
   /** This function is called periodically during operator control. */
   @Override
   public void teleopPeriodic() {
-    ledController.enabledPeriodic();
+    //ledController.enabledPeriodic();
   }
 
   /** This function is called once when the robot is disabled. */
@@ -99,7 +103,39 @@ public class Robot extends TimedRobot {
   /** This function is called periodically when disabled. */
   @Override
   public void disabledPeriodic() {
-    ledController.disabledPeriodic();
+    //ledController.disabledPeriodic();
+  }
+
+  @Override
+  public void simulationInit() {
+    // Example Only - startPose should be derived from some assumption
+    // of where your robot was placed on the field.
+    // The first pose in an autonomous path is often a good choice.
+    var startPose = new Pose2d(1, 1, new Rotation2d());
+    SubsystemsInst.getInst().drivetrain.resetOdometry(startPose);
+    SubsystemsInst.getInst().vision.resetSimPose(startPose);
+  }
+
+  @Override
+  public void simulationPeriodic() {
+      // Update drivetrain simulation
+      SubsystemsInst.getInst().drivetrain.simulationPeriodic();
+
+      // Update camera simulation
+      SubsystemsInst.getInst().vision.simulationPeriodic(SubsystemsInst.getInst().drivetrain.getSimPose());
+
+      var debugField = SubsystemsInst.getInst().vision.getSimDebugField();
+      debugField.getObject("EstimatedRobot").setPose(SubsystemsInst.getInst().drivetrain.getPose());
+      debugField.getObject("EstimatedRobotModules").setPoses(SubsystemsInst.getInst().drivetrain.getModulePoses());
+
+
+      // // Calculate battery voltage sag due to current draw
+      // var batteryVoltage =
+      //         BatterySim.calculateDefaultBatteryLoadedVoltage(drivetrain.getCurrentDraw());
+
+      // // Using max(0.1, voltage) here isn't a *physically correct* solution,
+      // // but it avoids problems with battery voltage measuring 0.
+      // RoboRioSim.setVInVoltage(Math.max(0.1, batteryVoltage));
   }
 
   /** This function is called once when test mode is enabled. */
