@@ -22,6 +22,7 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.math.util.Units;
 import frc.robot.Robot;
 import frc.robot.Utils.Constants;
 
@@ -37,12 +38,6 @@ public class SdsSwerveModule {
 
   private SparkMaxSim driveMotorSim;
   private SparkMaxSim turningMotorSim;
-  // Simple PID feedback controllers run on the roborio
-  private PIDController drivePidController = new PIDController(Constants.swerveDriveMotorP, Constants.swerveDriveMotorI, Constants.swerveDriveMotorD);
-  private double driveVoltage = 0.0;
-  // (A profiled steering PID controller may give better results by utilizing feedforward.)
-  private PIDController turnPidController = new PIDController(Constants.swerveTurningP, Constants.swerveTurningI, Constants.swerveTurningD);
-  private double turnVoltage = 0.0;
 
   private int driveID;
   private int turnID;
@@ -106,6 +101,7 @@ public class SdsSwerveModule {
     // ----- Simulation support;
     driveMotorSim = new SparkMaxSim(driveMotor, DCMotor.getNEO(1));
     turningMotorSim = new SparkMaxSim(turningMotor, DCMotor.getNEO(1));
+    turningMotorSim.setPosition(0.0);
   }
 
 
@@ -116,7 +112,7 @@ public class SdsSwerveModule {
    */
   public SwerveModuleState getState() {
     return new SwerveModuleState(
-        driveMotor.getEncoder().getVelocity(), new Rotation2d(ConvertedTurningPosition()));
+        driveMotor.getEncoder().getVelocity(), Rotation2d.fromRadians(ConvertedTurningPosition()));
   }
 
   /**
@@ -126,7 +122,7 @@ public class SdsSwerveModule {
    */
   public SwerveModulePosition getPosition() {
     return new SwerveModulePosition(
-        driveMotor.getEncoder().getPosition(), new Rotation2d(ConvertedTurningPosition()));
+        driveMotor.getEncoder().getPosition() * ((2.0 * Math.PI * Constants.kWheelRadius) / Constants.kDriveGearRatio), Rotation2d.fromRadians(ConvertedTurningPosition()));
   }
 
   public void changeDriveToBrake() {
@@ -158,40 +154,14 @@ public class SdsSwerveModule {
     desiredState.optimize(new Rotation2d(ConvertedTurningPosition()));
 
     double convertedPosition = MathUtil.angleModulus(desiredState.angle.getRadians()) + Math.PI;
-      
-    // if (i == 0) {
-    //   System.out.println("Measured Angle   " + driveID + ":   " + ConvertedTurningPosition());
-    //   System.out.println("Commanded Angle  " + driveID + ":   " + state.angle.getRadians());
-    //   System.out.println("Commanded Speed " + driveID + ":   " + state.speedMetersPerSecond);
-    //   System.out.println("Motor Speed     " + driveID + ": " + driveMotor.getEncoder().getVelocity());
-    //   SmartDashboard.putNumber("Swerve Angle " + turnID, state.angle.getRadians());
-    // }
-    // i = (i + 1) % 100;
-
-    // SmartDashboard.putNumber("Drive RPM" + driveID, driveMotor.getEncoder().getVelocity());
-    // SmartDashboard.putNumber("Module Angle" + driveID,turningEncoder.getAbsolutePosition());
-    // SmartDashboard.putNumber("Commanded Angle" + driveID, state.angle.getRadians());
 
     turningPIDController.setReference(convertedPosition, ControlType.kPosition);
     driveMotorController.setReference(desiredState.speedMetersPerSecond, ControlType.kVelocity);
-
-    if(Robot.isSimulation()) {
-      turnVoltage = turnPidController.calculate(
-          getAbsoluteHeading().getRadians(), convertedPosition);
-      driveVoltage = Constants.swerveDriveMotorFF * desiredState.speedMetersPerSecond + 
-          drivePidController.calculate(driveMotor.getEncoder().getVelocity(), desiredState.speedMetersPerSecond);
-      
-    }
-    //if (turnOutput > 0.5 ) {
-    //  turningMotor.setVoltage(turnOutput);
-    //} else {
-    //  turningMotor.setVoltage(0);
-    //}
   }
   
   /** Module heading reported by steering encoder. */
   public Rotation2d getAbsoluteHeading() {
-    return Rotation2d.fromRotations(turningMotor.getAbsoluteEncoder().getPosition());
+    return Rotation2d.fromRadians(ConvertedTurningPosition());
   }
 
 
@@ -200,26 +170,21 @@ public class SdsSwerveModule {
   }
 
   public double getDriveVoltage(){
-    return driveVoltage;
+    return driveMotor.getAppliedOutput() * 12.0;
   }
 
   
   public double getSteerVoltage(){
-    return turnVoltage;
+    return turningMotor.getAppliedOutput() * 12.0;
   }
 
   public void simulationUpdate(
-            double driveEncoderRate,
+            double driveRate,
             double driveCurrent,
-            double steerEncoderRate,
+            double steerRate,
             double steerCurrent) {
-        // driveMotorSim.setPosition(driveEncoderDist);
-        // driveMotorSim.setVelocity(driveEncoderRate);
-        // //this.driveCurrentSim = driveCurrent;
-        // turningMotorSim.setPosition(steerEncoderDist);
-        // turningMotorSim.setVelocity(steerEncoderRate);
-        // //this.steerCurrentSim = steerCurrent;
-        driveMotorSim.iterate(driveEncoderRate, 12.0, Robot.kDefaultPeriod);
-        turningMotorSim.iterate(steerEncoderRate, 12.0, Robot.kDefaultPeriod);
+        driveMotorSim.iterate(driveRate * (2.0 * Math.PI * Constants.kWheelRadius) / (Constants.kDriveGearRatio), 12.0, Robot.kDefaultPeriod);
+        turningMotorSim.iterate(Units.radiansPerSecondToRotationsPerMinute(steerRate), 12.0, Robot.kDefaultPeriod);
+        
     }
 }

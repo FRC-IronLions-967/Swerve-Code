@@ -56,13 +56,13 @@ public final class Constants {
     public static final SimpleMotorFeedforward kDriveSimFF =
             new SimpleMotorFeedforward( // real
                     0.25, // Voltage to break static friction
-                    2.5, // Volts per meter per second
+                    2.65, // Volts per meter per second
                     0.3 // Volts per meter per second squared
                     );
     // Steer feed forward
     public static final SimpleMotorFeedforward kSteerSimFF =
             new SimpleMotorFeedforward( // real
-                    0.5, // Voltage to break static friction
+                    1, // Voltage to break static friction
                     0.25, // Volts per radian per second
                     0.01 // Volts per radian per second squared
                     );
@@ -91,7 +91,7 @@ public final class Constants {
     // Vision Constants
     //Cam mounted facing backward, 0.298 meters behind center, 0.58 meters up from center.
     public static final Transform3d kRobotToCam =
-        new Transform3d(new Translation3d(-0.298, 0.0, 0.58), new Rotation3d(0,0.349,Math.PI)); 
+        new Transform3d(new Translation3d(-0.298, 0.0, 0.58), new Rotation3d(0,-0.349,Math.PI)); 
 
     // The layout of the AprilTags on the field
     public static final AprilTagFieldLayout kTagLayout = AprilTagFieldLayout.loadField(AprilTagFields.k2024Crescendo);

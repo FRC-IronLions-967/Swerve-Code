@@ -72,18 +72,17 @@ public class Drivetrain extends SubsystemBase {
   private final SwerveDrivePoseEstimator m_odometry =
       new SwerveDrivePoseEstimator(
           Constants.m_kinematics,
-          m_gyro.getRotation2d(),
+          Rotation2d.fromDegrees(m_gyro.getYaw()),
           new SwerveModulePosition[] {
             m_frontLeft.getPosition(),
             m_frontRight.getPosition(),
             m_backLeft.getPosition(),
             m_backRight.getPosition()
           },
-          new Pose2d()
+          new Pose2d(1, 1, new Rotation2d(180))
       );
 
   public Drivetrain() {
-    m_gyro.reset();
     fieldRelative = true;
     driveController = IO.getInstance().getDriverController();
 
@@ -160,7 +159,7 @@ public class Drivetrain extends SubsystemBase {
    */
   public void drive(double xSpeed, double ySpeed, double rot, boolean fieldRelative) {
     ChassisSpeeds chassisSpeeds = fieldRelative
-                ? ChassisSpeeds.fromFieldRelativeSpeeds(xSpeed, ySpeed, rot, Rotation2d.fromDegrees(-m_gyro.getFusedHeading()))
+                ? ChassisSpeeds.fromFieldRelativeSpeeds(xSpeed, ySpeed, rot, getPose().getRotation())
                 : new ChassisSpeeds(xSpeed, ySpeed, rot);
     //Time slice discretization code taken from 254/YAGSL
     //Compensates for second order kinematic drift
@@ -184,7 +183,7 @@ public class Drivetrain extends SubsystemBase {
 
     //Time slice discretization code taken from 254/YAGSL
     //Compensates for second order kinematic drift
-    ChassisSpeeds.discretize(chassisSpeeds, 0.02); 
+    ChassisSpeeds.discretize(chassisSpeeds, Robot.kDefaultPeriod); 
     var swerveModuleStates =
         Constants.m_kinematics.toSwerveModuleStates(chassisSpeeds);
     SwerveDriveKinematics.desaturateWheelSpeeds(swerveModuleStates, Constants.kMaxSpeed);
@@ -250,13 +249,8 @@ public class Drivetrain extends SubsystemBase {
    */
   public void updateOdometry() {
     m_odometry.update(
-        m_gyro.getRotation2d(),
-        new SwerveModulePosition[] {
-          m_frontLeft.getPosition(),
-          m_frontRight.getPosition(),
-          m_backLeft.getPosition(),
-          m_backRight.getPosition()
-        });
+        Rotation2d.fromDegrees(m_gyro.getYaw()),
+        getPosition());
   }
 
 
@@ -298,10 +292,10 @@ public class Drivetrain extends SubsystemBase {
       for (int i = 0; i < swerveMods.length; i++) {
           swerveMods[i].simulationUpdate(0, 0, 0, 0);
       }
-      angle.set(-pose.getRotation().getDegrees());
+      angle.set(pose.getRotation().getDegrees());
       angularAcceleration.set(0);
     }
-    m_odometry.resetPosition(m_gyro.getRotation2d(), getPosition(), pose);
+    m_odometry.resetPosition(Rotation2d.fromDegrees(m_gyro.getYaw()), getPosition(), pose);
   }
 
   
@@ -372,7 +366,7 @@ public class Drivetrain extends SubsystemBase {
       // mathematics). Xbox controllers return positive values when you pull to
       // the right by default.
       final var rot = limiter * limiter * m_rotLimiter.calculate(
-          Utils.cubePreserveSign(MathUtil.applyDeadband(-driveController.getRightStickX(), 0.1)
+          Utils.cubePreserveSign(MathUtil.applyDeadband(driveController.getRightStickX(), 0.1)
               * Constants.kMaxAngularSpeed));
     
 
@@ -455,7 +449,7 @@ public class Drivetrain extends SubsystemBase {
                   driveRate, driveCurrents[i], steerRate, steerCurrents[i]);
       }
 
-      angle.set(-swerveDriveSim.getPose().getRotation().getDegrees());
+      angle.set(swerveDriveSim.getPose().getRotation().getDegrees());
   }
 
   /**
