@@ -69,7 +69,7 @@ public class SdsSwerveModule {
     driveConfig
       .smartCurrentLimit(80)
       .idleMode(IdleMode.kCoast)
-      .inverted(true);
+      .inverted(false);
     driveConfig.closedLoop
       .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
       .pidf(Constants.swerveDriveMotorP, Constants.swerveDriveMotorI, Constants.swerveDriveMotorD, Constants.swerveDriveMotorFF);
@@ -122,7 +122,7 @@ public class SdsSwerveModule {
    */
   public SwerveModulePosition getPosition() {
     return new SwerveModulePosition(
-        driveMotor.getEncoder().getPosition() * ((2.0 * Math.PI * Constants.kWheelRadius) / Constants.kDriveGearRatio), Rotation2d.fromRadians(ConvertedTurningPosition()));
+        driveMotor.getEncoder().getPosition(), Rotation2d.fromRadians(ConvertedTurningPosition()));
   }
 
   public void changeDriveToBrake() {
@@ -183,7 +183,7 @@ public class SdsSwerveModule {
             double driveCurrent,
             double steerRate,
             double steerCurrent) {
-        driveMotorSim.iterate(driveRate * (2.0 * Math.PI * Constants.kWheelRadius) / (Constants.kDriveGearRatio), 12.0, Robot.kDefaultPeriod);
+        driveMotorSim.iterate(driveRate, 12.0, Robot.kDefaultPeriod);
         turningMotorSim.iterate(Units.radiansPerSecondToRotationsPerMinute(steerRate), 12.0, Robot.kDefaultPeriod);
         
     }
