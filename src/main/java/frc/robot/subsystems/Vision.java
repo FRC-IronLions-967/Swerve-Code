@@ -34,13 +34,13 @@ public class Vision extends SubsystemBase {
   // Cameras
   // Do not reference directly
   private PhotonCamera aprilTagCamera;
-  private PhotonCamera objectDetectionCamera;
+  //private PhotonCamera objectDetectionCamera;
 
   // Pipeline Results
   // These results are updated in the periodic
   // All methods should reference these results
   private PhotonPipelineResult aprilTagResult;
-  private PhotonPipelineResult objectResult;
+  //private PhotonPipelineResult objectResult;
   private boolean aprilTagDetected;
   private boolean objectDetected;
 
@@ -50,14 +50,14 @@ public class Vision extends SubsystemBase {
 
   // Simulation
   private PhotonCameraSim aprilTagSim;
-  private PhotonCameraSim objectDetectionSim;
+  //private PhotonCameraSim objectDetectionSim;
   private VisionSystemSim visionSim;
 
 
   /** Creates a new Vision. */
   public Vision() {
     aprilTagCamera = new PhotonCamera("April_Tag_Camera");
-    objectDetectionCamera = new PhotonCamera("Object_Detection_Camera");
+    //objectDetectionCamera = new PhotonCamera("Object_Detection_Camera");
 
     
     visionEstimator = new PhotonPoseEstimator(Constants.kTagLayout , PoseStrategy.MULTI_TAG_PNP_ON_COPROCESSOR, Constants.kRobotToCam);
@@ -79,7 +79,7 @@ public class Vision extends SubsystemBase {
         // Create a PhotonCameraSim which will update the linked PhotonCamera's values with visible
         // targets.
         aprilTagSim = new PhotonCameraSim(aprilTagCamera, cameraProp);
-        objectDetectionSim = new PhotonCameraSim(objectDetectionCamera);
+        //objectDetectionSim = new PhotonCameraSim(objectDetectionCamera);
         // Add the simulated camera to view the targets on this simulated field.
         visionSim.addCamera(aprilTagSim, Constants.kRobotToCam);
 
@@ -100,9 +100,9 @@ public class Vision extends SubsystemBase {
      */
     public Optional<EstimatedRobotPose> getEstimatedGlobalPose() {
         Optional<EstimatedRobotPose> visionEst = Optional.empty();
-        for (var change : aprilTagCamera.getAllUnreadResults()) {
-            visionEst = visionEstimator.update(change);
-            updateEstimationStdDevs(visionEst, change.getTargets());
+        if (aprilTagDetected) {
+            visionEst = visionEstimator.update(aprilTagResult);
+            updateEstimationStdDevs(visionEst, aprilTagResult.getTargets());
 
             // ----- Simulation
 
@@ -197,18 +197,18 @@ public class Vision extends SubsystemBase {
       }
     }
     
-    //Update Object Results
-    objectDetected = false;
-    var tempObjectResults = objectDetectionCamera.getAllUnreadResults();
-    if (!tempObjectResults.isEmpty()) {
-      // Camera processed a new frame since last
-      // Get the last one in the list.
-      objectResult = tempObjectResults.get(tempObjectResults.size() - 1);
-      if (objectResult.hasTargets()) {
-          // At least one AprilTag was seen by the camera
-          objectDetected = true;
-      }
-    }
+    // //Update Object Results
+    // objectDetected = false;
+    // var tempObjectResults = objectDetectionCamera.getAllUnreadResults();
+    // if (!tempObjectResults.isEmpty()) {
+    //   // Camera processed a new frame since last
+    //   // Get the last one in the list.
+    //   objectResult = tempObjectResults.get(tempObjectResults.size() - 1);
+    //   if (objectResult.hasTargets()) {
+    //       // At least one AprilTag was seen by the camera
+    //       objectDetected = true;
+    //   }
+    // }
 
     var pose = getEstimatedGlobalPose();
     pose.ifPresent(
