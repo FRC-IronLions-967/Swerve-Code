@@ -1,8 +1,5 @@
 package frc.robot.Utils;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import com.pathplanner.lib.config.ModuleConfig;
 import com.pathplanner.lib.config.RobotConfig;
 
@@ -20,8 +17,6 @@ import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
-import edu.wpi.first.wpilibj2.command.Command;
-import frc.robot.commands.DoNothingCommand;
 
 import static edu.wpi.first.units.Units.*;
 

@@ -15,9 +15,7 @@ import com.revrobotics.spark.SparkClosedLoopController;
 import com.revrobotics.spark.config.SparkBaseConfig.IdleMode;
 
 import edu.wpi.first.math.MathUtil;
-import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.geometry.Transform2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
@@ -34,16 +32,15 @@ public class SdsSwerveModule {
 
   private SparkMax turningMotor;
   private SparkMaxConfig turningConfig;
-  private SparkClosedLoopController turningPIDController;
+  private SparkClosedLoopController turningMotorController;
 
   private SparkMaxSim driveMotorSim;
   private SparkMaxSim turningMotorSim;
 
   private int driveID;
   private int turnID;
-  private Translation2d position;
+  private Translation2d location;
 
-  private int i;
   // Gains are for example purposes only - must be determined for your own robot!
 
 
@@ -61,7 +58,7 @@ public class SdsSwerveModule {
   public SdsSwerveModule(
       int driveMotorCANId,
       int turningMotorCANId,
-      Translation2d modulePosition) {
+      Translation2d moduleLocation) {
 
     driveMotor = new SparkMax(driveMotorCANId, MotorType.kBrushless);
     turningMotor = new SparkMax(turningMotorCANId, MotorType.kBrushless);
@@ -93,14 +90,14 @@ public class SdsSwerveModule {
     turningMotor.configure(turningConfig, SparkBase.ResetMode.kResetSafeParameters, SparkBase.PersistMode.kPersistParameters);
     
     driveMotorController = driveMotor.getClosedLoopController();
-    turningPIDController = turningMotor.getClosedLoopController();
+    turningMotorController = turningMotor.getClosedLoopController();
 
     driveMotorController.setReference(0.0, ControlType.kVelocity);
-    turningPIDController.setReference(0.0, ControlType.kPosition);
+    turningMotorController.setReference(0.0, ControlType.kPosition);
 
     driveID = driveMotorCANId;
     turnID = turningMotorCANId;
-    position = modulePosition;
+    location = moduleLocation;
 
     // ----- Simulation support;
     driveMotorSim = new SparkMaxSim(driveMotor, DCMotor.getNEO(1));
@@ -158,7 +155,7 @@ public class SdsSwerveModule {
 
     double convertedPosition = MathUtil.angleModulus(desiredState.angle.getRadians()) + Math.PI;
 
-    turningPIDController.setReference(convertedPosition, ControlType.kPosition);
+    turningMotorController.setReference(convertedPosition, ControlType.kPosition);
     driveMotorController.setReference(desiredState.speedMetersPerSecond, ControlType.kVelocity);
   }
   
@@ -169,7 +166,7 @@ public class SdsSwerveModule {
 
 
   public Translation2d getModuleLocation() {
-    return position;
+    return location;
   }
 
   public double getDriveVoltage(){
