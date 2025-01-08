@@ -63,7 +63,7 @@ public final class Constants {
     public static final SimpleMotorFeedforward kSteerSimFF =
             new SimpleMotorFeedforward( // real
                     0.5, // Voltage to break static friction
-                    0.25, // Volts per radian per second
+                    0.2, // Volts per radian per second
                     0.01 // Volts per radian per second squared
                     );
   

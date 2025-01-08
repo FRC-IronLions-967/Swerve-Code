@@ -290,7 +290,7 @@ public class Drivetrain extends SubsystemBase {
       // we shouldnt realistically be resetting pose after startup, but we will handle it anyway for
       // testing
       for (int i = 0; i < swerveMods.length; i++) {
-          swerveMods[i].simulationUpdate(0, 0, 0, 0);
+          swerveMods[i].simulationUpdate(0, 0, 0, 0, 0, 0);
       }
       angle.set(pose.getRotation().getDegrees());
       angularAcceleration.set(0);
@@ -366,7 +366,7 @@ public class Drivetrain extends SubsystemBase {
       // mathematics). Xbox controllers return positive values when you pull to
       // the right by default.
       final var rot = limiter * limiter * m_rotLimiter.calculate(
-          Utils.cubePreserveSign(MathUtil.applyDeadband(driveController.getRightStickX(), 0.1)
+          Utils.cubePreserveSign(MathUtil.applyDeadband(-driveController.getRightStickX(), 0.1)
               * Constants.kMaxAngularSpeed));
     
 
@@ -443,10 +443,12 @@ public class Drivetrain extends SubsystemBase {
       double[] steerCurrents = swerveDriveSim.getSteerCurrentDraw();
       for (double current : steerCurrents) totalCurrentDraw += current;
       for (int i = 0; i < swerveMods.length; i++) {
+          double drivePos = driveStates.get(i).get(0, 0);
           double driveRate = driveStates.get(i).get(1, 0);
+          double steerPos = steerStates.get(i).get(0, 0);
           double steerRate = steerStates.get(i).get(1, 0);
           swerveMods[i].simulationUpdate(
-                  driveRate, driveCurrents[i], steerRate, steerCurrents[i]);
+                  drivePos, driveRate, driveCurrents[i], steerPos, steerRate, steerCurrents[i]);
       }
 
       angle.set(swerveDriveSim.getPose().getRotation().getDegrees());

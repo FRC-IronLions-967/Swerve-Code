@@ -69,7 +69,7 @@ public class SdsSwerveModule {
     driveConfig
       .smartCurrentLimit(80)
       .idleMode(IdleMode.kCoast)
-      .inverted(false);
+      .inverted(true);
     driveConfig.closedLoop
       .feedbackSensor(FeedbackSensor.kPrimaryEncoder)
       .pidf(Constants.swerveDriveMotorP, Constants.swerveDriveMotorI, Constants.swerveDriveMotorD, Constants.swerveDriveMotorFF);
@@ -84,6 +84,7 @@ public class SdsSwerveModule {
       .smartCurrentLimit(40);
     turningConfig.closedLoop
       .pid(Constants.swerveTurningP, Constants.swerveTurningI, Constants.swerveTurningD)
+      .positionWrappingInputRange(0, 2*Math.PI)
       .positionWrappingEnabled(true)
       .feedbackSensor(FeedbackSensor.kAbsoluteEncoder);
     turningConfig.absoluteEncoder
@@ -94,6 +95,9 @@ public class SdsSwerveModule {
     driveMotorController = driveMotor.getClosedLoopController();
     turningPIDController = turningMotor.getClosedLoopController();
 
+    driveMotorController.setReference(0.0, ControlType.kVelocity);
+    turningPIDController.setReference(0.0, ControlType.kPosition);
+
     driveID = driveMotorCANId;
     turnID = turningMotorCANId;
     position = modulePosition;
@@ -101,7 +105,6 @@ public class SdsSwerveModule {
     // ----- Simulation support;
     driveMotorSim = new SparkMaxSim(driveMotor, DCMotor.getNEO(1));
     turningMotorSim = new SparkMaxSim(turningMotor, DCMotor.getNEO(1));
-    turningMotorSim.setPosition(0.0);
   }
 
 
@@ -179,12 +182,18 @@ public class SdsSwerveModule {
   }
 
   public void simulationUpdate(
+            double drivePos,
             double driveRate,
             double driveCurrent,
+            double steerPos,
             double steerRate,
             double steerCurrent) {
-        driveMotorSim.iterate(driveRate, 12.0, Robot.kDefaultPeriod);
-        turningMotorSim.iterate(Units.radiansPerSecondToRotationsPerMinute(steerRate), 12.0, Robot.kDefaultPeriod);
-        
-    }
+    double steerRateRot = Units.radiansPerSecondToRotationsPerMinute(steerRate);
+    driveMotorSim.setPosition(drivePos);
+    driveMotorSim.iterate(driveRate, 12.0, Robot.kDefaultPeriod);
+    turningMotorSim.iterate(steerRateRot / Constants.kSteerGearRatio, 12.0, Robot.kDefaultPeriod);
+    turningMotorSim.setPosition(MathUtil.angleModulus(steerPos) + Math.PI);
+    turningMotorSim.getAbsoluteEncoderSim().setPosition(MathUtil.angleModulus(steerPos) + Math.PI);
+      
+  }
 }
