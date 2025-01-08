@@ -1,17 +1,22 @@
 package frc.robot.Utils;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import com.pathplanner.lib.config.ModuleConfig;
 import com.pathplanner.lib.config.RobotConfig;
 
+import edu.wpi.first.apriltag.AprilTagFieldLayout;
+import edu.wpi.first.apriltag.AprilTagFields;
+import edu.wpi.first.math.Matrix;
+import edu.wpi.first.math.VecBuilder;
+import edu.wpi.first.math.controller.SimpleMotorFeedforward;
+import edu.wpi.first.math.geometry.Rotation3d;
+import edu.wpi.first.math.geometry.Transform3d;
 import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
+import edu.wpi.first.math.numbers.N1;
+import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
-import edu.wpi.first.wpilibj2.command.Command;
-import frc.robot.commands.DoNothingCommand;
 
 import static edu.wpi.first.units.Units.*;
 
@@ -25,7 +30,8 @@ public final class Constants {
     public static final double kWheelRadius = 0.0489;
     //the number above is acurate
     public static final double kCoefficientFriction = 1.542;
-    public static final double kGearRatio = 6.75;
+    public static final double kDriveGearRatio = 6.75;
+    public static final double kSteerGearRatio = 150.0/7.0;
     //needs tunings
     public static final double kSecondsPerMinute = 60.0;
 
@@ -39,6 +45,22 @@ public final class Constants {
     public static final double swerveDriveMotorI = 0.0;
     public static final double swerveDriveMotorD = 0.025;
     public static final double swerveDriveMotorFF = 0.28;
+
+    // Sim Feedforward
+    // Linear drive feed forward
+    public static final SimpleMotorFeedforward kDriveSimFF =
+            new SimpleMotorFeedforward( // real
+                    0.25, // Voltage to break static friction
+                    2.65, // Volts per meter per second
+                    0.3 // Volts per meter per second squared
+                    );
+    // Steer feed forward
+    public static final SimpleMotorFeedforward kSteerSimFF =
+            new SimpleMotorFeedforward( // real
+                    0.5, // Voltage to break static friction
+                    0.2, // Volts per radian per second
+                    0.01 // Volts per radian per second squared
+                    );
   
     // private static final double kModuleMaxAngularVelocity = kMaxAngularSpeed;
     // private static final double kModuleMaxAngularAcceleration =
@@ -61,103 +83,18 @@ public final class Constants {
           new ModuleConfig(kWheelRadius, kMaxSpeed, kCoefficientFriction, DCMotor.getNEO(1), 80.0, 4),
           m_frontLeftLocation, m_frontRightLocation, m_backLeftLocation, m_backRightLocation);
 
-    public static final Map<String, Command> autoEventMap = new HashMap<>();
-    static {
-      autoEventMap.put("autoEvent1", new DoNothingCommand());
-      autoEventMap.put("autoEvent2", new DoNothingCommand());
-      autoEventMap.put("autoEvent3", new DoNothingCommand());
-    }
+    // Vision Constants
+    //Cam mounted facing backward, 0.298 meters behind center, 0.58 meters up from center.
+    public static final Transform3d kRobotToCam =
+        new Transform3d(new Translation3d(-0.298, 0.0, 0.58), new Rotation3d(0,-0.349,Math.PI)); 
 
-    public static final Map<Integer, Double> kSwerveOffsets = new HashMap<>();
-    static {
-      kSwerveOffsets.put(0, 2.017568133691152);
-      kSwerveOffsets.put(1, 1.6252273289298291);
-      kSwerveOffsets.put(2, -2.7157190558997755);
-      kSwerveOffsets.put(3, 0.23217007031624007);
-    }
+    // The layout of the AprilTags on the field
+    public static final AprilTagFieldLayout kTagLayout = AprilTagFieldLayout.loadField(AprilTagFields.k2024Crescendo);
 
-    public static final Map<Double, Double> swerveRotMap = new HashMap<>();
-    static {
-      double y;
-      y = 0.00;
-      for (double x = 0.00; x < 1.01; x = x + 0.01) {
-        if (x < -0.90) {
-          y = y - 0.03;//-1.00
-          swerveRotMap.put(x, y);
-        }
-        if (x < -0.80 && x > -0.90) {
-          y = y - 0.015;//-0.70
-          swerveRotMap.put(x, y);
-        }
-        if (x < -0.70 && x > -0.80) {
-          y = y - 0.013;//-0.55
-          swerveRotMap.put(x, y);
-        }
-        if (x < -0.60 && x > -0.70) {
-          y = y - 0.011;//-0.42
-          swerveRotMap.put(x, y);
-        }
-        if (x < -0.50 && x > -0.60) {
-          y = y - 0.008;//-0.31
-          swerveRotMap.put(x, y);
-        }
-        if (x < -0.40 && x > -0.50) {
-          y = y - 0.007;//-0.23
-          swerveRotMap.put(x, y);
-        }
-        if (x < -0.30 && x > -0.40) {
-          y = y - 0.006;//-0.16
-          swerveRotMap.put(x, y);
-        }
-        if (x < -0.20 && x > -0.30) {
-          y = y - 0.005;//-0.10
-          swerveRotMap.put(x, y);
-        }
-        if (x < -0.10 && x > -0.20) {
-          y = y - 0.005;//-0.05
-          swerveRotMap.put(x, y);
-        }
-        if (x < 0.10 && x > -0.10) {
-          y = 0;//0.00
-          swerveRotMap.put(x, y);
-        }
-        if (x >= 0.1 && x < 0.2) {
-          y = y + 0.005;//0.05
-          swerveRotMap.put(x, y);
-        }
-        if (x >= 0.2 && x < 0.3) {
-          y = y + 0.005;//0.10
-          swerveRotMap.put(x, y);
-        }
-        if (x >= 0.3 && x < 0.4) {
-          y = y + 0.006;//0.16
-          swerveRotMap.put(x, y);        
-        }
-        if (x >= 0.4 && x < 0.5) {
-          y = y + 0.007;//0.23
-          swerveRotMap.put(x, y);        
-        }
-        if (x >= 0.5 && x < 0.6) {
-          y = y + 0.008;//0.31
-          swerveRotMap.put(x, y);        
-        }
-        if (x >= 0.6 && x < 0.7) {
-          y = y + 0.011;//0.42
-          swerveRotMap.put(x, y);        
-        }
-        if (x >= 0.7 && x < 0.8) {
-          y = y + 0.013;//0.55
-          swerveRotMap.put(x, y);        
-        }
-        if (x >= 0.8 && x < 0.9) {
-          y = y + 0.015;//0.70
-          swerveRotMap.put(x, y);        
-        }
-        if (x >= 0.9) {
-          y = y + 0.03;//1.00
-          swerveRotMap.put(x, y);          
-        }
-      }
-    }
+    // The standard deviations of our vision estimated poses, which affect correction rate
+    // (Fake values. Experiment and determine estimation noise on an actual robot.)
+    public static final Matrix<N3, N1> kSingleTagStdDevs = VecBuilder.fill(4, 4, 8);
+    public static final Matrix<N3, N1> kMultiTagStdDevs = VecBuilder.fill(0.5, 0.5, 1);
+
 
 }

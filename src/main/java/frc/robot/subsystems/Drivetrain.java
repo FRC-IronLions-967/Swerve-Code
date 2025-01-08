@@ -10,23 +10,32 @@ import com.pathplanner.lib.config.PIDConstants;
 import com.pathplanner.lib.config.RobotConfig;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 
+import edu.wpi.first.hal.SimDouble;
 import edu.wpi.first.math.MathUtil;
+import edu.wpi.first.math.Matrix;
+import edu.wpi.first.math.estimator.SwerveDrivePoseEstimator;
 import edu.wpi.first.math.filter.SlewRateLimiter;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Transform2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
-import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
+import edu.wpi.first.math.numbers.N1;
+import edu.wpi.first.math.numbers.N3;
+import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.simulation.SimDeviceSim;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.IO;
+import frc.robot.Robot;
 import frc.robot.Utils.Constants;
 import frc.robot.Utils.Utils;
 import frc.robot.lib.SdsSwerveModule;
 import frc.robot.lib.controls.XBoxController;
+import frc.robot.lib.SwerveDriveSim;
 
 
 
@@ -41,30 +50,56 @@ public class Drivetrain extends SubsystemBase {
   private final SlewRateLimiter m_yspeedLimiter = new SlewRateLimiter(10);
   private final SlewRateLimiter m_rotLimiter = new SlewRateLimiter(10);
 
-  private final SdsSwerveModule m_frontLeft = new SdsSwerveModule(5, 6);
-  private final SdsSwerveModule m_backLeft = new SdsSwerveModule(7, 8);
-  private final SdsSwerveModule m_frontRight = new SdsSwerveModule(3, 4);
-  private final SdsSwerveModule m_backRight = new SdsSwerveModule(1, 2);
+  private final SdsSwerveModule m_frontLeft = new SdsSwerveModule(5, 6, Constants.m_frontLeftLocation);
+  private final SdsSwerveModule m_frontRight = new SdsSwerveModule(3, 4, Constants.m_frontRightLocation);
+  private final SdsSwerveModule m_backLeft = new SdsSwerveModule(7, 8, Constants.m_backLeftLocation);
+  private final SdsSwerveModule m_backRight = new SdsSwerveModule(1, 2, Constants.m_backRightLocation);
+
+  private final SdsSwerveModule[] swerveMods = {m_frontLeft, m_frontRight, m_backLeft, m_backRight};
+
   private XBoxController driveController;
-//first two colums above are done
+  // first two colums above are done
   private final AHRS m_gyro = new AHRS(AHRS.NavXComType.kMXP_SPI, AHRS.NavXUpdateRate.k50Hz);
 
+  // ----- Simulation
+  private final SimDeviceSim gyroSim;
+  private final SimDouble angle;
+  private final SimDouble angularAcceleration;
+  private final SwerveDriveSim swerveDriveSim;
+  private double totalCurrentDraw = 0;
 
-  private final SwerveDriveOdometry m_odometry =
-      new SwerveDriveOdometry(
+  private final SwerveDrivePoseEstimator m_odometry =
+      new SwerveDrivePoseEstimator(
           Constants.m_kinematics,
-          m_gyro.getRotation2d(),
+          Rotation2d.fromDegrees(m_gyro.getYaw()),
           new SwerveModulePosition[] {
             m_frontLeft.getPosition(),
             m_frontRight.getPosition(),
             m_backLeft.getPosition(),
             m_backRight.getPosition()
-          });
+          },
+          new Pose2d(1, 1, new Rotation2d(180))
+      );
 
   public Drivetrain() {
-    m_gyro.reset();
     fieldRelative = true;
     driveController = IO.getInstance().getDriverController();
+
+    // ----- Simulation
+
+    gyroSim = new SimDeviceSim("navX-Sensor", m_gyro.getPort());
+    angle = gyroSim.getDouble("Yaw");
+    angularAcceleration = gyroSim.getDouble("LinearWorldAccelZ");
+    swerveDriveSim =
+            new SwerveDriveSim(
+                    Constants.kDriveSimFF,
+                    DCMotor.getNEO(1),
+                    Constants.kDriveGearRatio,
+                    Constants.kWheelRadius,
+                    Constants.kSteerSimFF,
+                    DCMotor.getNEO(1),
+                    Constants.kSteerGearRatio,
+                    Constants.m_kinematics);
   }
 
 
@@ -123,7 +158,7 @@ public class Drivetrain extends SubsystemBase {
    */
   public void drive(double xSpeed, double ySpeed, double rot, boolean fieldRelative) {
     ChassisSpeeds chassisSpeeds = fieldRelative
-                ? ChassisSpeeds.fromFieldRelativeSpeeds(xSpeed, ySpeed, rot, Rotation2d.fromDegrees(-m_gyro.getFusedHeading()))
+                ? ChassisSpeeds.fromFieldRelativeSpeeds(xSpeed, ySpeed, rot, getPose().getRotation())
                 : new ChassisSpeeds(xSpeed, ySpeed, rot);
     //Time slice discretization code taken from 254/YAGSL
     //Compensates for second order kinematic drift
@@ -147,7 +182,7 @@ public class Drivetrain extends SubsystemBase {
 
     //Time slice discretization code taken from 254/YAGSL
     //Compensates for second order kinematic drift
-    ChassisSpeeds.discretize(chassisSpeeds, 0.02); 
+    ChassisSpeeds.discretize(chassisSpeeds, Robot.kDefaultPeriod); 
     var swerveModuleStates =
         Constants.m_kinematics.toSwerveModuleStates(chassisSpeeds);
     SwerveDriveKinematics.desaturateWheelSpeeds(swerveModuleStates, Constants.kMaxSpeed);
@@ -168,30 +203,6 @@ public class Drivetrain extends SubsystemBase {
     m_frontRight.setDesiredState(swerveModuleStates[1]);
     m_backLeft.setDesiredState(swerveModuleStates[2]);
     m_backRight.setDesiredState(swerveModuleStates[3]);
-  }
-
-
-  /**
-   * Updates the field relative position of the robot.
-   */
-  public void updateOdometry() {
-    m_odometry.update(
-        m_gyro.getRotation2d(),
-        new SwerveModulePosition[] {
-          m_frontLeft.getPosition(),
-          m_frontRight.getPosition(),
-          m_backLeft.getPosition(),
-          m_backRight.getPosition()
-        });
-  }
-
-
-  /**
-   * Get the pose of the robot
-   * @return current odometry pose
-   */
-  public Pose2d getPose() {
-    return m_odometry.getPoseMeters();
   }
 
 
@@ -233,11 +244,68 @@ public class Drivetrain extends SubsystemBase {
 
 
   /**
+   * Updates the field relative position of the robot.
+   */
+  public void updateOdometry() {
+    m_odometry.update(
+        Rotation2d.fromDegrees(m_gyro.getYaw()),
+        getPosition());
+  }
+
+
+  /**
+   * Get the pose of the robot
+   * @return current odometry pose
+   */
+  public Pose2d getPose() {
+    return m_odometry.getEstimatedPosition();
+  }
+
+
+  /**
+   * Get the Pose2d of each swerve module based on kinematics and current robot pose. The returned
+   * array order matches the kinematics module order.
+   */
+  public Pose2d[] getModulePoses() {
+      Pose2d[] modulePoses = new Pose2d[swerveMods.length];
+      for (int i = 0; i < swerveMods.length; i++) {
+          var module = swerveMods[i];
+          modulePoses[i] =
+              getPose().transformBy(
+                  new Transform2d(module.getModuleLocation(), module.getAbsoluteHeading()));
+      }
+      return modulePoses;
+  }
+
+
+
+  /**
    * reset the odometry object
    * @param pose new pose to set odometry to.
    */
   public void resetOdometry(Pose2d pose) {
-    m_odometry.resetPosition(m_gyro.getRotation2d(), getPosition(), pose);
+    if (Robot.isSimulation()) {
+      swerveDriveSim.reset(pose, false);
+      // we shouldnt realistically be resetting pose after startup, but we will handle it anyway for
+      // testing
+      for (int i = 0; i < swerveMods.length; i++) {
+          swerveMods[i].simulationUpdate(0, 0, 0, 0, 0, 0);
+      }
+      angle.set(pose.getRotation().getDegrees());
+      angularAcceleration.set(0);
+    }
+    m_odometry.resetPosition(Rotation2d.fromDegrees(m_gyro.getYaw()), getPosition(), pose);
+  }
+
+  
+  /**
+   * Feed vision measurement through to pose estimator
+   * @param visionRobotPose vision pose estimate in meters
+   * @param timestamp timestamp in seconds
+   * @param visionMeasurementStdDevs standard deviations of tag estimate
+   */
+  public void addVisionMeasurement(Pose2d visionRobotPose, double timestamp, Matrix<N3, N1> visionMeasurementStdDevs){
+    m_odometry.addVisionMeasurement(visionRobotPose, timestamp, visionMeasurementStdDevs);
   }
 
 
@@ -334,17 +402,6 @@ public class Drivetrain extends SubsystemBase {
       }
   }
 
-  /**
-   * Drive the robot using sensor inputs for the rotation and driver input translation.
-   * @param rotation rot/sec
-   */
-  public void lockonMoveTowardsObject(double rotation, double speed) {
-      if ( DriverStation.isTeleop() ) {
-        SmartDashboard.putNumber("Rotation", -0.1 * rotation);
-        drive(speed, 0, -0.05 * rotation, false);
-      }
-  }  
-
   
   /**
    * Get joystick values 
@@ -358,5 +415,54 @@ public class Drivetrain extends SubsystemBase {
       SmartDashboard.putBoolean("FieldRelative", fieldRelative);
       // SmartDashboard.putNumber("GyroHeading", m_gyro.getRotation2d().getDegrees());
     } 
+
+
+  // ----- Simulation
+
+  public void simulationPeriodic() {
+      // Pass commanded motor velocities into swerve drive simulation
+      double[] driveInputs = new double[swerveMods.length];
+      double[] steerInputs = new double[swerveMods.length];
+      for (int i = 0; i < swerveMods.length; i++) {
+          driveInputs[i] = swerveMods[i].getDriveVoltage();
+          steerInputs[i] = swerveMods[i].getSteerVoltage();
+      }
+      swerveDriveSim.setDriveInputs(driveInputs);
+      swerveDriveSim.setSteerInputs(steerInputs);
+
+      // Simulate one timestep
+      swerveDriveSim.update(Robot.kDefaultPeriod);
+
+      // Update module and gyro values with simulated values
+      var driveStates = swerveDriveSim.getDriveStates();
+      var steerStates = swerveDriveSim.getSteerStates();
+      totalCurrentDraw = 0;
+      double[] driveCurrents = swerveDriveSim.getDriveCurrentDraw();
+      for (double current : driveCurrents) totalCurrentDraw += current;
+      double[] steerCurrents = swerveDriveSim.getSteerCurrentDraw();
+      for (double current : steerCurrents) totalCurrentDraw += current;
+      for (int i = 0; i < swerveMods.length; i++) {
+          double drivePos = driveStates.get(i).get(0, 0);
+          double driveRate = driveStates.get(i).get(1, 0);
+          double steerPos = steerStates.get(i).get(0, 0);
+          double steerRate = steerStates.get(i).get(1, 0);
+          swerveMods[i].simulationUpdate(
+                  drivePos, driveRate, driveCurrents[i], steerPos, steerRate, steerCurrents[i]);
+      }
+
+      angle.set(swerveDriveSim.getPose().getRotation().getDegrees());
+  }
+
+  /**
+   * The "actual" pose of the robot on the field used in simulation. This is different from the
+   * swerve drive's estimated pose.
+   */
+  public Pose2d getSimPose() {
+      return swerveDriveSim.getPose();
+  }
+
+  public double getCurrentDraw() {
+      return totalCurrentDraw;
+  }
      
 }
